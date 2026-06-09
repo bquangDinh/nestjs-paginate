@@ -49,28 +49,29 @@ const logger: Logger = new Logger('nestjs-paginate')
 export { AddFilterOptions, FilterComparator, FilterOperator, FilterSuffix }
 
 export class Paginated<T> {
-    data: T[]
-    meta: {
+    data!: T[]
+    meta!: {
         itemsPerPage: number
         totalItems?: number
         currentPage?: number
         totalPages?: number
         sortBy: SortBy<T>
-        searchBy: Column<T>[]
-        search: string
-        select: string[]
+        searchBy: Column<T>[] | undefined
+        search: string | undefined
+        select: string[] | undefined
         filter?: {
             [column: string]: string | string[]
         }
         cursor?: string
     }
-    links: {
+    links!: {
         first?: string
         previous?: string
         current: string
         next?: string
         last?: string
     }
+    constructor() {}
 }
 
 export enum PaginationType {
@@ -86,7 +87,6 @@ export interface PaginateConfig<T> {
     sortableColumns: Column<T>[]
     nullSort?: 'first' | 'last'
     searchableColumns?: Column<T>[]
-    // eslint-disable-next-line @typescript-eslint/ban-types
     select?: (Column<T> | (string & {}))[]
     maxLimit?: number
     defaultSortBy?: SortBy<T>
@@ -116,7 +116,7 @@ export enum PaginationLimit {
     COUNTER_ONLY = 0,
 }
 
-function generateWhereStatement<T>(
+function generateWhereStatement<T extends ObjectLiteral>(
     queryBuilder: SelectQueryBuilder<T>,
     obj: FindOptionsWhere<T> | FindOptionsWhere<T>[]
 ) {
@@ -124,12 +124,12 @@ function generateWhereStatement<T>(
     return toTransform.map((item) => flattenWhereAndTransform(queryBuilder, item).join(' AND ')).join(' OR ')
 }
 
-function flattenWhereAndTransform<T>(
+function flattenWhereAndTransform<T extends ObjectLiteral>(
     queryBuilder: SelectQueryBuilder<T>,
     obj: FindOptionsWhere<T>,
     separator = '.',
     parentKey = ''
-) {
+): (string | undefined)[] {
     return Object.entries(obj).flatMap(([key, value]) => {
         if (obj.hasOwnProperty(key)) {
             const joinedKey = parentKey ? `${parentKey}${separator}${key}` : key
@@ -139,8 +139,8 @@ function flattenWhereAndTransform<T>(
             } else {
                 const property = getPropertiesByColumnName(joinedKey)
                 const { isVirtualProperty, query: virtualQuery } = extractVirtualProperty(queryBuilder, property)
-                const isRelation = checkIsRelation(queryBuilder, property.propertyPath)
-                const isEmbedded = checkIsEmbedded(queryBuilder, property.propertyPath)
+                const isRelation = checkIsRelation(queryBuilder, property.propertyPath ?? '')
+                const isEmbedded = checkIsEmbedded(queryBuilder, property.propertyPath ?? '')
                 const alias = fixColumnAlias(
                     property,
                     queryBuilder.alias,
@@ -212,7 +212,15 @@ export async function paginate<T extends ObjectLiteral>(
 ): Promise<Paginated<T>> {
     const dbType = (isRepository(repo) ? repo.manager : repo).connection.options.type
     const isMySqlOrMariaDb = ['mysql', 'mariadb'].includes(dbType)
-    const metadata = isRepository(repo) ? repo.metadata : repo.expressionMap.mainAlias.metadata
+    const metadata = isRepository(repo)
+        ? repo.metadata
+        : repo.expressionMap.mainAlias
+          ? repo.expressionMap.mainAlias.metadata
+          : repo.expressionMap.aliases && repo.expressionMap.aliases.length
+            ? repo.expressionMap.aliases[0].metadata
+            : (() => {
+                  throw new Error('Could not determine metadata: QueryBuilder has no main alias')
+              })()
 
     const page = positiveNumberOrDefault(query.page, 1, 1)
 
@@ -228,12 +236,12 @@ export async function paginate<T extends ObjectLiteral>(
         query.limit === PaginationLimit.COUNTER_ONLY
             ? PaginationLimit.COUNTER_ONLY
             : isPaginated === true
-            ? maxLimit === PaginationLimit.NO_PAGINATION
-                ? query.limit ?? defaultLimit
-                : query.limit === PaginationLimit.NO_PAGINATION
-                ? defaultLimit
-                : Math.min(query.limit ?? defaultLimit, maxLimit)
-            : defaultLimit
+              ? maxLimit === PaginationLimit.NO_PAGINATION
+                  ? (query.limit ?? defaultLimit)
+                  : query.limit === PaginationLimit.NO_PAGINATION
+                    ? defaultLimit
+                    : Math.min(query.limit ?? defaultLimit, maxLimit)
+              : defaultLimit
 
     const generateNullCursor = (): string => {
         return 'A' + '0'.repeat(15) // null values ​​should be looked up last, so use the smallest prefix
@@ -327,7 +335,7 @@ export async function paginate<T extends ObjectLiteral>(
                 }
 
                 // Extract value from nested object
-                let value = item
+                let value: any = item
                 for (let i = 0; i < propertyPath.length; i++) {
                     const key = propertyPath[i]
 
@@ -615,8 +623,8 @@ export async function paginate<T extends ObjectLiteral>(
                     queryBuilder,
                     columnProperties
                 )
-                const isRelation = checkIsRelation(queryBuilder, columnProperties.propertyPath)
-                const isEmbedded = checkIsEmbedded(queryBuilder, columnProperties.propertyPath)
+                const isRelation = checkIsRelation(queryBuilder, columnProperties.propertyPath ?? '')
+                const isEmbedded = checkIsEmbedded(queryBuilder, columnProperties.propertyPath ?? '')
                 const alias = fixColumnAlias(
                     columnProperties,
                     queryBuilder.alias,
@@ -689,7 +697,9 @@ export async function paginate<T extends ObjectLiteral>(
         filterJoinMethods = addFilter(
             queryBuilder,
             query,
-            config.filterableColumns,
+            config.filterableColumns as
+                | MappedColumns<T, (FilterOperator | FilterSuffix | FilterQuantifier | FilterComparator)[] | true>
+                | undefined,
             {
                 maxAndValues: config.maxAndValues,
             },
@@ -1038,7 +1048,7 @@ export async function paginate<T extends ObjectLiteral>(
     } else if (isPaginated && config.paginationType !== PaginationType.CURSOR) {
         if (config.buildCountQuery) {
             items = await queryBuilder.getMany()
-            totalItems = await config.buildCountQuery(queryBuilder.clone()).getCount()
+            totalItems = await config.buildCountQuery(queryBuilder.clone() as any).getCount()
         } else {
             ;[items, totalItems] = await queryBuilder.getManyAndCount()
         }

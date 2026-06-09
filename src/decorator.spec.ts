@@ -11,7 +11,6 @@ import { Request as ExpressRequest } from 'express'
 import { FastifyRequest } from 'fastify'
 import { Paginate, PaginateQuery } from './decorator'
 
-// eslint-disable-next-line @typescript-eslint/ban-types
 function getParamDecoratorFactory<T>(decorator: Function): CustomParamFactory {
     class Test {
         public test(@decorator() _value: T): void {

@@ -25,12 +25,11 @@ const FULL_CONFIG = {
     select: ['id', 'name'],
 } satisfies PaginateConfig<TestDto>
 
-class TestDto {
+interface TestDto {
     id: string
     name: string
 }
 
-// eslint-disable-next-line @typescript-eslint/ban-types
 async function getSwaggerDefinitionForEndpoint<T>(entityType: Type<T>, config: PaginateConfig<T>) {
     class TestController {
         @PaginatedSwaggerDocs(entityType, config)

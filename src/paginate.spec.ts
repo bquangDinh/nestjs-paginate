@@ -1,5 +1,5 @@
+// @ts-nocheck
 import { HttpException, Logger } from '@nestjs/common'
-import { clone } from 'lodash'
 import * as process from 'process'
 import { DataSource, In, Like, Repository, SelectQueryBuilder, TypeORMError } from 'typeorm'
 import { BaseDataSourceOptions } from 'typeorm/data-source/BaseDataSourceOptions'
@@ -34,7 +34,9 @@ afterAll(() => {
     jest.restoreAllMocks() // Restore default logger behavior
 })
 
-const isoStringToDate = (isoString) => new Date(isoString)
+const deepClone = <T>(v: T): T => JSON.parse(JSON.stringify(v))
+
+const isoStringToDate = (isoString: string) => new Date(isoString)
 
 describe('paginate', () => {
     let dataSource: DataSource
@@ -71,7 +73,7 @@ describe('paginate', () => {
                 CatHomePillowEntity,
                 CatHomePillowBrandEntity,
                 ToyShopEntity,
-                process.env.DB === 'postgres' ? CatHairEntity : undefined,
+                ...(process.env.DB === 'postgres' ? [CatHairEntity] : []),
             ],
         }
 
@@ -81,7 +83,7 @@ describe('paginate', () => {
                     ...dbOptions,
                     type: 'postgres',
                     host: process.env.DB_HOST || 'localhost',
-                    port: +process.env.POSTGRESS_DB_PORT || 5432,
+                    port: Number(process.env.POSTGRESS_DB_PORT ?? 5432),
                     username: process.env.DB_USERNAME || 'root',
                     password: process.env.DB_PASSWORD || 'pass',
                     database: process.env.DB_DATABASE || 'test',
@@ -92,7 +94,7 @@ describe('paginate', () => {
                     ...dbOptions,
                     type: 'mariadb',
                     host: process.env.DB_HOST || 'localhost',
-                    port: +process.env.MARIA_DB_PORT || 3306,
+                    port: Number(process.env.MARIA_DB_PORT ?? 3306),
                     username: process.env.DB_USERNAME || 'root',
                     password: process.env.DB_PASSWORD || 'pass',
                     database: process.env.DB_DATABASE || 'test',
@@ -101,7 +103,7 @@ describe('paginate', () => {
             case 'sqlite':
                 dataSource = new DataSource({
                     ...dbOptions,
-                    type: 'sqlite',
+                    type: 'sqlite' as any,
                     database: ':memory:',
                 })
                 break
@@ -223,15 +225,9 @@ describe('paginate', () => {
             catToyRepo.create({ name: 'String', cat: cats[1], size: { height: 1, width: 1, length: 50 } }),
         ])
 
-        catToysWithoutShop = catToys.map(({ shop: _, ...other }) => {
-            const newInstance = new CatToyEntity()
-            for (const otherKey in other) {
-                newInstance[otherKey] = other[otherKey]
-            }
-            return newInstance
-        })
+        catToysWithoutShop = catToys.map(({ shop: _, ...other }) => Object.assign(new CatToyEntity(), other as any))
 
-        pillowBrand = await catHomePillowBrandRepo.save({ name: 'Purrfection', quality: null })
+        pillowBrand = await catHomePillowBrandRepo.save({ name: 'Purrfection', quality: null } as any)
         naptimePillow = await catHomePillowRepo.save({ color: 'black', brand: pillowBrand })
         catHomes = await catHomeRepo.save([
             catHomeRepo.create({
@@ -1021,12 +1017,12 @@ describe('paginate', () => {
         const result = await paginate<CatEntity>(query, catRepo, config)
 
         expect(result.meta.search).toStrictEqual('Mouse')
-        const toy = clone(catToysWithoutShop[1])
-        delete toy.cat
-        const toy2 = clone(catToysWithoutShop[2])
-        delete toy2.cat
+        const toy = deepClone(catToysWithoutShop[1])
+        delete (toy as any).cat
+        const toy2 = deepClone(catToysWithoutShop[2])
+        delete (toy2 as any).cat
 
-        expect(result.data).toStrictEqual([Object.assign(clone(cats[0]), { toys: [toy2, toy] })])
+        expect(result.data).toStrictEqual([Object.assign(deepClone(cats[0]), { toys: [toy2, toy] })])
         expect(result.links.current).toBe('?page=1&limit=20&sortBy=id:ASC&sortBy=toys.id:DESC&search=Mouse')
     })
 
@@ -1043,7 +1039,7 @@ describe('paginate', () => {
         const result = await paginate<CatHomeEntity>(query, catHomeRepo, config)
         expect(result.meta.sortBy).toStrictEqual([['cat.id', 'DESC']])
 
-        const catHomesClone = clone([catHomes[0], catHomes[1], catHomes[2]])
+        const catHomesClone = deepClone([catHomes[0], catHomes[1], catHomes[2]])
         catHomesClone[0].countCat = cats.filter((cat) => cat.id === catHomesClone[0].cat.id).length
         catHomesClone[1].countCat = cats.filter((cat) => cat.id === catHomesClone[1].cat.id).length
         catHomesClone[2].countCat = cats.filter((cat) => cat.id === catHomesClone[2].cat.id).length
@@ -1115,14 +1111,14 @@ describe('paginate', () => {
         const result = await paginate<CatEntity>(query, catRepo, config)
 
         expect(result.meta.search).toStrictEqual('Mouse')
-        const toy1 = clone(catToys[1])
-        delete toy1.cat
-        const toy2 = clone(catToys[2])
-        delete toy2.cat
+        const toy1 = deepClone(catToys[1])
+        delete (toy1 as any).cat
+        const toy2 = deepClone(catToys[2])
+        delete (toy2 as any).cat
 
-        delete result.data[0].toys[0].shop.address
+        delete (result.data[0].toys[0].shop as any).address
 
-        expect(result.data).toStrictEqual([Object.assign(clone(cats[0]), { toys: [toy2, toy1] })])
+        expect(result.data).toStrictEqual([Object.assign(deepClone(cats[0]), { toys: [toy2, toy1] })])
         expect(result.links.current).toBe('?page=1&limit=20&sortBy=toys.id:DESC&search=Mouse')
     })
 
@@ -1141,7 +1137,7 @@ describe('paginate', () => {
 
         expect(result.meta.search).toStrictEqual('Garfield')
 
-        const catHomesClone = clone(catHomes[1])
+        const catHomesClone = deepClone(catHomes[1])
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
 
         expect(result.data).toStrictEqual([catHomesClone])
@@ -1161,19 +1157,19 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat = clone(cats[1])
-        const catHomesClone = clone(catHomes[1])
-        const catHomePillowsClone3 = clone(catHomePillows[3])
-        delete catHomePillowsClone3.home
-        const catHomePillowsClone4 = clone(catHomePillows[4])
-        delete catHomePillowsClone4.home
-        const catHomePillowsClone5 = clone(catHomePillows[5])
-        delete catHomePillowsClone5.home
+        const cat = deepClone(cats[1])
+        const catHomesClone = deepClone(catHomes[1])
+        const catHomePillowsClone3 = deepClone(catHomePillows[3])
+        delete (catHomePillowsClone3 as any).home
+        const catHomePillowsClone4 = deepClone(catHomePillows[4])
+        delete (catHomePillowsClone4 as any).home
+        const catHomePillowsClone5 = deepClone(catHomePillows[5])
+        delete (catHomePillowsClone5 as any).home
 
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
         catHomesClone.pillows = [catHomePillowsClone3, catHomePillowsClone4, catHomePillowsClone5]
         cat.home = catHomesClone
-        delete cat.home.cat
+        delete (cat.home as any).cat
 
         expect(result.meta.search).toStrictEqual('Garfield')
         expect(result.data).toStrictEqual([cat])
@@ -1194,19 +1190,19 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat = clone(cats[1])
-        const catHomesClone = clone(catHomes[1])
-        const catHomePillowsClone3 = clone(catHomePillows[3])
-        delete catHomePillowsClone3.home
-        const catHomePillowsClone4 = clone(catHomePillows[4])
-        delete catHomePillowsClone4.home
-        const catHomePillowsClone5 = clone(catHomePillows[5])
-        delete catHomePillowsClone5.home
+        const cat = deepClone(cats[1])
+        const catHomesClone = deepClone(catHomes[1])
+        const catHomePillowsClone3 = deepClone(catHomePillows[3])
+        delete (catHomePillowsClone3 as any).home
+        const catHomePillowsClone4 = deepClone(catHomePillows[4])
+        delete (catHomePillowsClone4 as any).home
+        const catHomePillowsClone5 = deepClone(catHomePillows[5])
+        delete (catHomePillowsClone5 as any).home
 
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
         catHomesClone.pillows = [catHomePillowsClone3, catHomePillowsClone4, catHomePillowsClone5]
         cat.home = catHomesClone
-        delete cat.home.cat
+        delete (cat.home as any).cat
 
         expect(result.meta.search).toStrictEqual('Garfield')
         expect(result.data).toStrictEqual([cat])
@@ -1501,16 +1497,16 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat1 = clone(cats[0])
-        const cat2 = clone(cats[1])
-        const catToys1 = clone(catToysWithoutShop[0])
-        const catToys2 = clone(catToysWithoutShop[1])
-        const catToys3 = clone(catToysWithoutShop[2])
-        const catToys4 = clone(catToysWithoutShop[3])
-        delete catToys1.cat
-        delete catToys2.cat
-        delete catToys3.cat
-        delete catToys4.cat
+        const cat1 = deepClone(cats[0])
+        const cat2 = deepClone(cats[1])
+        const catToys1 = deepClone(catToysWithoutShop[0])
+        const catToys2 = deepClone(catToysWithoutShop[1])
+        const catToys3 = deepClone(catToysWithoutShop[2])
+        const catToys4 = deepClone(catToysWithoutShop[3])
+        delete (catToys1 as any).cat
+        delete (catToys2 as any).cat
+        delete (catToys3 as any).cat
+        delete (catToys4 as any).cat
         cat1.toys = [catToys1, catToys2, catToys3]
         cat2.toys = [catToys4]
 
@@ -1543,7 +1539,7 @@ describe('paginate', () => {
             'cat.name': '$not:Garfield',
         })
 
-        const catHomesClones = [clone(catHomes[0]), clone(catHomes[2])]
+        const catHomesClones = [deepClone(catHomes[0]), deepClone(catHomes[2])]
         catHomesClones[0].countCat = cats.filter((cat) => cat.id === catHomesClones[0].cat.id).length
         catHomesClones[1].countCat = cats.filter((cat) => cat.id === catHomesClones[1].cat.id).length
 
@@ -1572,7 +1568,7 @@ describe('paginate', () => {
             'cat.age': '$in:4,6',
         })
 
-        const catHomesClones = [clone(catHomes[0]), clone(catHomes[2])]
+        const catHomesClones = [deepClone(catHomes[0]), deepClone(catHomes[2])]
         catHomesClones[0].countCat = cats.filter((cat) => cat.id === catHomesClones[0].cat.id).length
         catHomesClones[1].countCat = cats.filter((cat) => cat.id === catHomesClones[1].cat.id).length
 
@@ -1601,7 +1597,7 @@ describe('paginate', () => {
             'cat.age': '$btw:6,10',
         })
 
-        const catHomesClone = clone(catHomes[0])
+        const catHomesClone = deepClone(catHomes[0])
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
 
         expect(result.data).toStrictEqual([catHomesClone])
@@ -1652,16 +1648,15 @@ describe('paginate', () => {
         const result = await paginate<CatEntity>(query, catRepo, config)
 
         const copyCats = cats.map((cat: CatEntity) => {
-            const copy = clone(cat)
-            copy.home = null
+            const copy = (deepClone(cat)(copy as any).home = null)
             copy.toys = []
             return copy
         })
 
         const copyHomes = catHomes.map((home: CatHomeEntity) => {
-            const copy = clone(home)
+            const copy = deepClone(home)
             copy.countCat = cats.filter((cat) => cat.id === copy.cat.id).length
-            delete copy.cat
+            delete (copy as any).cat
             return copy
         })
 
@@ -1670,8 +1665,8 @@ describe('paginate', () => {
         copyCats[2].home = copyHomes[2]
 
         const copyToys = catToysWithoutShop.map((toy: CatToyEntity) => {
-            const copy = clone(toy)
-            delete copy.cat
+            const copy = deepClone(toy)
+            delete (copy as any).cat
             return copy
         })
         copyCats[0].toys = [copyToys[0], copyToys[2], copyToys[1]]
@@ -1715,26 +1710,26 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const toy0 = clone(catToysWithoutShop[0])
-        delete toy0.cat
+        const toy0 = deepClone(catToysWithoutShop[0])
+        delete (toy0 as any).cat
 
-        const toy1 = clone(catToysWithoutShop[1])
-        delete toy1.cat
+        const toy1 = deepClone(catToysWithoutShop[1])
+        delete (toy1 as any).cat
 
-        const toy2 = clone(catToysWithoutShop[2])
-        delete toy2.cat
+        const toy2 = deepClone(catToysWithoutShop[2])
+        delete (toy2 as any).cat
 
-        const toy3 = clone(catToysWithoutShop[3])
-        delete toy3.cat
+        const toy3 = deepClone(catToysWithoutShop[3])
+        delete (toy3 as any).cat
 
         const orderedCats = [
-            Object.assign(clone(cats[6]), { toys: [] }),
-            Object.assign(clone(cats[5]), { toys: [] }),
-            Object.assign(clone(cats[4]), { toys: [] }),
-            Object.assign(clone(cats[3]), { toys: [] }),
-            Object.assign(clone(cats[2]), { toys: [] }),
-            Object.assign(clone(cats[1]), { toys: [toy3] }),
-            Object.assign(clone(cats[0]), { toys: [toy1, toy2, toy0] }),
+            Object.assign(deepClone(cats[6]), { toys: [] }),
+            Object.assign(deepClone(cats[5]), { toys: [] }),
+            Object.assign(deepClone(cats[4]), { toys: [] }),
+            Object.assign(deepClone(cats[3]), { toys: [] }),
+            Object.assign(deepClone(cats[2]), { toys: [] }),
+            Object.assign(deepClone(cats[1]), { toys: [toy3] }),
+            Object.assign(deepClone(cats[0]), { toys: [toy1, toy2, toy0] }),
         ]
         expect(result.data).toStrictEqual(orderedCats)
         expect(result.links.current).toBe(
@@ -1778,7 +1773,7 @@ describe('paginate', () => {
         }
 
         const result = await paginate<CatHomeEntity>(query, catHomeRepo, config)
-        const orderedHomes = clone([catHomes[1], catHomes[0], catHomes[2]])
+        const orderedHomes = deepClone([catHomes[1], catHomes[0], catHomes[2]])
 
         orderedHomes[0].countCat = cats.filter((cat) => cat.id === orderedHomes[0].cat.id).length
         orderedHomes[1].countCat = cats.filter((cat) => cat.id === orderedHomes[1].cat.id).length
@@ -1819,12 +1814,10 @@ describe('paginate', () => {
 
         expect(result.meta.search).toStrictEqual('10')
 
-        const copyCat = clone(cats[4])
-        copyCat.home = null
+        const copyCat = (deepClone(cats[4])(copyCat as any).home = null)
         copyCat.toys = []
 
-        const copyCat2 = clone(cats[5])
-        copyCat2.home = null
+        const copyCat2 = (deepClone(cats[5])(copyCat2 as any).home = null)
         copyCat2.toys = []
 
         expect(result.data).toStrictEqual([copyCat, copyCat2])
@@ -1861,15 +1854,15 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const toy0 = clone(catToys[0])
-        delete toy0.cat
+        const toy0 = deepClone(catToys[0])
+        delete (toy0 as any).cat
 
-        const toy3 = clone(catToys[3])
-        delete toy3.cat
+        const toy3 = deepClone(catToys[3])
+        delete (toy3 as any).cat
 
         expect(result.data).toStrictEqual([
-            Object.assign(clone(cats[0]), { toys: [toy0] }),
-            Object.assign(clone(cats[1]), { toys: [toy3] }),
+            Object.assign(deepClone(cats[0]), { toys: [toy0] }),
+            Object.assign(deepClone(cats[1]), { toys: [toy3] }),
         ])
         expect(result.links.current).toBe('?page=1&limit=20&sortBy=id:ASC&search=1')
     })
@@ -1886,7 +1879,7 @@ describe('paginate', () => {
         }
 
         const result = await paginate<CatHomeEntity>(query, catHomeRepo, config)
-        const catHomeClone = clone(catHomes[1])
+        const catHomeClone = deepClone(catHomes[1])
         catHomeClone.countCat = cats.filter((cat) => cat.id === catHomeClone.cat.id).length
         expect(result.data).toStrictEqual([catHomeClone])
         expect(result.links.current).toBe('?page=1&limit=20&sortBy=id:ASC&search=30')
@@ -1954,16 +1947,16 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const home = clone(catHomes[1])
+        const home = deepClone(catHomes[1])
         home.countCat = cats.filter((cat) => cat.id === home.cat.id).length
-        delete home.cat
+        delete (home as any).cat
 
         const copyCats = [
-            Object.assign(clone(cats[1]), { home: home }),
-            Object.assign(clone(cats[3]), { home: null }),
-            Object.assign(clone(cats[4]), { home: null }),
-            Object.assign(clone(cats[5]), { home: null }),
-            Object.assign(clone(cats[6]), { home: null }),
+            Object.assign(deepClone(cats[1]), { home: home }),
+            Object.assign(deepClone(cats[3]), { home: null }),
+            Object.assign(deepClone(cats[4]), { home: null }),
+            Object.assign(deepClone(cats[5]), { home: null }),
+            Object.assign(deepClone(cats[6]), { home: null }),
         ]
 
         expect(result.data).toStrictEqual(copyCats)
@@ -2011,9 +2004,9 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat2 = clone(cats[1])
-        const catToys3 = clone(catToys[3])
-        delete catToys3.cat
+        const cat2 = deepClone(cats[1])
+        const catToys3 = deepClone(catToys[3])
+        delete (catToys3 as any).cat
         cat2.toys = [catToys3]
 
         expect(result.meta.filter).toStrictEqual({
@@ -2043,7 +2036,7 @@ describe('paginate', () => {
         expect(result.meta.filter).toStrictEqual({
             'cat.(size.height)': '$eq:30',
         })
-        const catClone = clone(catHomes[1])
+        const catClone = deepClone(catHomes[1])
         catClone.countCat = cats.filter((cat) => cat.size.height === 30 && cat.id == catClone.cat.id).length
         expect(result.data).toStrictEqual([catClone])
         expect(result.links.current).toBe('?page=1&limit=20&sortBy=id:ASC&filter.cat.(size.height)=$eq:30')
@@ -2069,7 +2062,7 @@ describe('paginate', () => {
         expect(result.meta.filter).toStrictEqual({
             'cat.(size.height)': '$in:10,30,35',
         })
-        const catClone = clone(catHomes[1])
+        const catClone = deepClone(catHomes[1])
         catClone.countCat = cats.filter(
             (cat) =>
                 (cat.size.height === 10 || cat.size.height === 30 || cat.size.height === 35) &&
@@ -2100,7 +2093,7 @@ describe('paginate', () => {
             'cat.(size.height)': '$btw:18,33',
         })
 
-        const catHomeClones = clone(catHomes)
+        const catHomeClones = deepClone(catHomes)
         catHomeClones[0].countCat = cats.filter(
             (cat) => cat.size.height >= 18 && cat.size.height <= 33 && cat.id == catHomeClones[0].cat.id
         ).length
@@ -2362,9 +2355,9 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
         const expectedResult = [1, 2].map((i) => {
-            const ret = Object.assign(clone(cats[i]), { home: clone(catHomes[i]) })
+            const ret = Object.assign(deepClone(cats[i]), { home: deepClone(catHomes[i]) })
             ret.home.countCat = 1
-            delete ret.home.cat
+            delete (ret.home as any).cat
             return ret
         })
 
@@ -2389,9 +2382,9 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
         const expectedResult = [0].map((i) => {
-            const ret = Object.assign(clone(cats[i]), { home: Object.assign(clone(catHomes[i])) })
+            const ret = Object.assign(deepClone(cats[i]), { home: Object.assign(deepClone(catHomes[i])) })
             ret.home.countCat = 1
-            delete ret.home.cat
+            delete (ret.home as any).cat
             return ret
         })
 
@@ -2415,9 +2408,9 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
         const expectedResult = [2].map((i) => {
-            const ret = Object.assign(clone(cats[i]), { home: Object.assign(clone(catHomes[i])) })
+            const ret = Object.assign(deepClone(cats[i]), { home: Object.assign(deepClone(catHomes[i])) })
             ret.home.countCat = 1
-            delete ret.home.cat
+            delete (ret.home as any).cat
             return ret
         })
 
@@ -2549,7 +2542,8 @@ describe('paginate', () => {
         { operator: '$ilike', name: 'ILike' },
     ])('should get operator function $name for "$operator"', ({ operator, name }) => {
         const func = OperatorSymbolToFunction.get(operator as FilterOperator)
-        expect(func.name).toStrictEqual(name)
+        expect(func).toBeDefined()
+        expect((func as any).name).toStrictEqual(name)
     })
 
     for (const cc of [FilterComparator.AND, FilterComparator.OR, '']) {
@@ -3090,15 +3084,15 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat = clone(cats[1])
-        const catHomesClone = clone(catHomes[1])
-        const catHomePillowsClone = clone(catHomePillows[3])
-        delete catHomePillowsClone.home
+        const cat = deepClone(cats[1])
+        const catHomesClone = deepClone(catHomes[1])
+        const catHomePillowsClone = deepClone(catHomePillows[3])
+        delete (catHomePillowsClone as any).home
 
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
         catHomesClone.pillows = [catHomePillowsClone]
         cat.home = catHomesClone
-        delete cat.home.cat
+        delete (cat.home as any).cat
 
         expect(result.meta.search).toStrictEqual('pink')
         expect(result.data).toStrictEqual([cat])
@@ -3119,17 +3113,17 @@ describe('paginate', () => {
 
         const result = await paginate<CatEntity>(query, catRepo, config)
 
-        const cat = clone(cats[1])
-        const catHomesClone = clone(catHomes[1])
-        const catHomePillowsClone = clone(catHomePillows.slice(3, 6))
+        const cat = deepClone(cats[1])
+        const catHomesClone = deepClone(catHomes[1])
+        const catHomePillowsClone = deepClone(catHomePillows.slice(3, 6))
         catHomePillowsClone.forEach((pillow) => {
-            delete pillow.home
+            delete (pillow as any).home
         })
 
         catHomesClone.countCat = cats.filter((cat) => cat.id === catHomesClone.cat.id).length
         catHomesClone.pillows = catHomePillowsClone
         cat.home = catHomesClone
-        delete cat.home.cat
+        delete (cat.home as any).cat
 
         expect(result.meta.filter['home.pillows.color']).toStrictEqual('pink')
         expect(result.data).toStrictEqual([cat])
@@ -3894,8 +3888,8 @@ describe('paginate', () => {
 
             const result = await paginate<CatEntity>(query, catRepo, config)
             const expectedResult = [0, 1, 2].map((i) => {
-                const ret = Object.assign(clone(cats[i]), { home: Object.assign(clone(catHomes[i])) })
-                delete ret.home.cat
+                const ret = Object.assign(deepClone(cats[i]), { home: Object.assign(deepClone(catHomes[i])) })
+                delete (ret.home as any).cat
                 return ret
             })
 
@@ -3915,13 +3909,13 @@ describe('paginate', () => {
 
             const result = await paginate<CatEntity>(query, catRepo, config)
             const expectedResult = [3, 4, 5, 6, 0, 1, 2].map((i) => {
-                const ret = clone(cats[i])
+                const ret = deepClone(cats[i])
                 if (i < 3) {
-                    ret.home = clone(catHomes[i])
+                    ret.home = deepClone(catHomes[i])
                     ret.home.countCat = cats.filter((cat) => cat.id === ret.home.cat.id).length
-                    delete ret.home.cat
+                    delete (ret.home as any).cat
                 } else {
-                    ret.home = null
+                    ;(ret as any).home = null
                 }
                 return ret
             })
