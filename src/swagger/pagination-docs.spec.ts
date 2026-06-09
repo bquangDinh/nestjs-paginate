@@ -25,9 +25,13 @@ const FULL_CONFIG = {
     select: ['id', 'name'],
 } satisfies PaginateConfig<TestDto>
 
-interface TestDto {
+class TestDto {
     id: string
     name: string
+    constructor(id: string, name: string) {
+        this.id = id
+        this.name = name
+    }
 }
 
 async function getSwaggerDefinitionForEndpoint<T>(entityType: Type<T>, config: PaginateConfig<T>) {
