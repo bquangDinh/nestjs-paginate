@@ -1,0 +1,10 @@
+import { PaginateConfig } from '../paginate';
+export declare function SortBy(paginationConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare function Limit(paginationConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare function Select(paginationConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare function Where(paginationConfig: PaginateConfig<any>): <TFunction extends Function, Y>(target: TFunction | object, propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<Y>) => void;
+export declare function Page(): MethodDecorator & ClassDecorator;
+export declare function Search(paginateConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare function SearchBy(paginateConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare function WithDeleted(paginateConfig: PaginateConfig<any>): MethodDecorator & ClassDecorator;
+export declare const ApiPaginationQuery: (paginationConfig: PaginateConfig<any>) => <TFunction extends Function, Y>(target: TFunction | object, propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<Y>) => void;
