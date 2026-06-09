@@ -6,7 +6,6 @@ import { PaginatedDocumented } from './paginated-swagger.type'
 
 export const ApiOkPaginatedResponse = <DTO extends Type<unknown> | string>(
     dataDto: DTO,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     paginatedConfig: PaginateConfig<any>
 ) => {
     const cols = paginatedConfig?.filterableColumns || {}
@@ -19,34 +18,18 @@ export const ApiOkPaginatedResponse = <DTO extends Type<unknown> | string>(
                     { $ref: getSchemaPath(PaginatedDocumented) },
                     {
                         properties: {
-                            data: {
-                                type: 'array',
-                                items: { $ref: getSchemaPath(dataDto) },
-                            },
+                            data: { type: 'array', items: { $ref: getSchemaPath(dataDto) } },
                             meta: {
                                 properties: {
-                                    select: {
-                                        type: 'array',
-                                        items: {
-                                            type: 'string',
-                                            enum: paginatedConfig?.select,
-                                        },
-                                    },
+                                    select: { type: 'array', items: { type: 'string', enum: paginatedConfig?.select } },
                                     filter: {
                                         type: 'object',
                                         properties: Object.keys(cols).reduce(
                                             (acc, key) => {
                                                 acc[key] = {
                                                     oneOf: [
-                                                        {
-                                                            type: 'string',
-                                                        },
-                                                        {
-                                                            type: 'array',
-                                                            items: {
-                                                                type: 'string',
-                                                            },
-                                                        },
+                                                        { type: 'string' },
+                                                        { type: 'array', items: { type: 'string' } },
                                                     ],
                                                 }
                                                 return acc
