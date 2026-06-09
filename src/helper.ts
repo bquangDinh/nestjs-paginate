@@ -1,7 +1,7 @@
 import { mergeWith } from 'lodash'
-import { FindOperator, FindOptionsRelations, Repository, SelectQueryBuilder } from 'typeorm'
-import { ColumnMetadata } from 'typeorm/metadata/ColumnMetadata'
-import { OrmUtils } from 'typeorm/util/OrmUtils'
+import { EntityMetadata, FindOperator, FindOptionsRelations, Repository, SelectQueryBuilder } from 'typeorm'
+
+type ColumnMetadata = EntityMetadata['columns'][number]
 
 /**
  * Joins 2 keys as `K`, `K.P`, `K.(P` or `K.P)`
@@ -433,7 +433,10 @@ export function isFindOperator<T>(value: unknown | FindOperator<T>): value is Fi
 
 export function createRelationSchema<T>(configurationRelations: RelationSchemaInput<T>): RelationSchema<T> {
     return Array.isArray(configurationRelations)
-        ? OrmUtils.propertyPathsToTruthyObject(configurationRelations)
+        ? configurationRelations.reduce((relationSchema, relationPath) => {
+              relationSchema[relationPath] = true
+              return relationSchema
+          }, {} as RelationSchema<T>)
         : (configurationRelations as RelationSchema<T>)
 }
 

@@ -10,7 +10,6 @@ import {
     Repository,
     SelectQueryBuilder,
 } from 'typeorm'
-import { WherePredicateOperator } from 'typeorm/query-builder/WhereClause'
 import { PaginateQuery } from './decorator'
 import { addFilter, AddFilterOptions, FilterComparator, FilterOperator, FilterQuantifier, FilterSuffix } from './filter'
 import {
@@ -43,6 +42,12 @@ import {
     SortBy,
 } from './helper'
 import globalConfig from './global-config'
+
+type WherePredicateOperator = {
+    operator: string
+    parameters: any[]
+    condition?: any
+}
 
 const logger: Logger = new Logger('nestjs-paginate')
 
@@ -151,7 +156,7 @@ function flattenWhereAndTransform<T extends ObjectLiteral>(
                     queryBuilder
                 )
                 const whereClause = queryBuilder['createWhereConditionExpression'](
-                    queryBuilder['getWherePredicateCondition'](alias, value)
+                    queryBuilder['getWherePredicateCondition'](alias, value) as any
                 )
 
                 const allJoinedTables = queryBuilder.expressionMap.joinAttributes.reduce(
@@ -994,7 +999,7 @@ export async function paginate<T extends ObjectLiteral>(
                             condition.parameters[0] = `CAST(${condition.parameters[0]} AS text)`
                         }
 
-                        qb.orWhere(qb['createWhereConditionExpression'](condition), {
+                        qb.orWhere(qb['createWhereConditionExpression'](condition as any), {
                             [property.column]: `%${query.search}%`,
                         })
                     }
@@ -1031,7 +1036,7 @@ export async function paginate<T extends ObjectLiteral>(
                                         condition.parameters[0] = `CAST(${condition.parameters[0]} AS text)`
                                     }
 
-                                    subQb.orWhere(subQb['createWhereConditionExpression'](condition), {
+                                    subQb.orWhere(subQb['createWhereConditionExpression'](condition as any), {
                                         [`${property.column}_${index}`]: `%${searchWord}%`,
                                     })
                                 }

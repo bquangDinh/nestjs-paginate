@@ -18,7 +18,6 @@ import {
     Not,
     SelectQueryBuilder,
 } from 'typeorm'
-import { WherePredicateOperator } from 'typeorm/query-builder/WhereClause'
 import { PaginateQuery } from './decorator'
 import {
     andWhereAllExist,
@@ -37,9 +36,16 @@ import {
     quoteColumn,
     resolveJsonbPath,
 } from './helper'
-import { EmbeddedMetadata } from 'typeorm/metadata/EmbeddedMetadata'
-import { RelationMetadata } from 'typeorm/metadata/RelationMetadata'
 import { addRelationsFromSchema } from './paginate'
+
+type EmbeddedMetadata = EntityMetadata['embeddeds'][number]
+type RelationMetadata = EntityMetadata['relations'][number]
+
+type WherePredicateOperator = {
+    operator: string
+    parameters: any[]
+    condition?: any
+}
 
 export enum FilterOperator {
     EQ = '$eq',
@@ -265,7 +271,7 @@ export function addWhereCondition<T>(qb: SelectQueryBuilder<T>, column: string, 
         ) {
             condition.parameters[0] = `cardinality(${condition.parameters[0]})`
         }
-        const expression = qb['createWhereConditionExpression'](condition)
+        const expression = qb['createWhereConditionExpression'](condition as any)
         if (columnFilter.comparator === FilterComparator.OR) {
             qb.orWhere(expression, parameters)
         } else {
