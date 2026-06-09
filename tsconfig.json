@@ -10,7 +10,7 @@
     "rootDir": "./src",
     "outDir": "./lib",
     "baseUrl": "./",
-    "ignoreDeprecations": "6.0",
+    "ignoreDeprecations": "5.0",
     "incremental": true,
     "skipLibCheck": true, // https://stackoverflow.com/questions/55680391/typescript-error-ts2403-subsequent-variable-declarations-must-have-the-same-typ
     "strict": false,
